@@ -1,0 +1,25 @@
+{
+  "scope": {
+    "rate": 4,
+    "excludeSeaSeries": true
+  },
+  "graphUpdateWindow": {
+    "start": "10:30",
+    "end": "22:30",
+    "timezone": "Asia/Tokyo",
+    "approxIntervalMinutes": 121
+  },
+  "plannedSnapshots": [
+    "10:35",
+    "12:36",
+    "14:37",
+    "16:38",
+    "18:39",
+    "20:40",
+    "22:41"
+  ],
+  "notes": [
+    "Times are collection targets based on the user's observed Site777 update cadence, not guaranteed Site777 publication times.",
+    "Keep every snapshot so intraday wave formation can be compared, not only the final daily graph."
+  ]
+}
