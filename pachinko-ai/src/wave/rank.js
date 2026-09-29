@@ -1,0 +1,2 @@
+import {waveFeatures} from './features.js';
+export function rankWaves(machines=[]){return machines.map(m=>{const f=waveFeatures(m.points||[]);const reversal=Math.min(30,(f.fromTrough||0)/1000);const depth=Math.min(25,(f.maxDrawdown||0)/1500);const structure=Math.min(25,(f.turnRate||0)*50);const sample=Math.min(20,(f.n||0)/5);return{machineNo:m.machineNo,model:m.model,score:Math.round(Math.min(100,reversal+depth+structure+sample)),features:f}}).sort((a,b)=>b.score-a.score)}
