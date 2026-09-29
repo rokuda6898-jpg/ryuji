@@ -1,0 +1,5 @@
+[
+{"date":"2026-09-27","rate":4,"machineNo":"101","model":"sample","spins":1800,"diffBalls":-5000,"hits":8},
+{"date":"2026-09-28","rate":4,"machineNo":"101","model":"sample","spins":2100,"diffBalls":-3000,"hits":10},
+{"date":"2026-09-29","rate":4,"machineNo":"101","model":"sample","spins":2200,"diffBalls":1200,"hits":14}
+]
