@@ -1,0 +1,2 @@
+import fs from 'node:fs';import {rankWaves} from './rank.js';import {islandSync} from './island-sync.js';import {permutationTest} from './null-test.js';
+const rows=JSON.parse(fs.readFileSync(process.argv[2]||'data/waves.normalized.json','utf8'));const ranking=rankWaves(rows).map(x=>{const m=rows.find(r=>r.machineNo===x.machineNo);return{...x,nullTest:permutationTest(m?.points||[],500)}});console.log(JSON.stringify({ranking,synchronization:islandSync(rows)},null,2));
