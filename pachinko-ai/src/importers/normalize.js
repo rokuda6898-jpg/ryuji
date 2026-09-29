@@ -1,0 +1,1 @@
+export function normalize(records){return records.map(r=>({date:String(r.date||''),rate:Number(r.rate||4),machineNo:String(r.machineNo||''),model:String(r.model||''),spins:Number(r.spins||0),diffBalls:Number(r.diffBalls||0),hits:Number(r.hits||0),island:r.island??null,position:r.position??null})).filter(r=>r.rate===4&&r.machineNo)}
