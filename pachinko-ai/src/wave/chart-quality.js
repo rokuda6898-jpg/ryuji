@@ -1,0 +1,1 @@
+export function assessTrace(trace){const q=trace?.quality||{};const n=trace?.points?.length||0;const coverage=q.coverage||0, confidence=q.avgConfidence||0;const usable=n>=80&&coverage>=.65&&confidence>=.35;return{usable,score:Math.round(100*Math.min(1,(coverage*.55+confidence*.45))),reason:usable?'ok':n<80?'too_few_points':coverage<.65?'low_coverage':'ambiguous_trace'}}
