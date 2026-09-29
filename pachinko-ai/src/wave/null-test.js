@@ -1,0 +1,3 @@
+import {waveFeatures} from './features.js';
+function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+export function permutationTest(points=[],runs=1000){const y=points.map(p=>Number(p.value??p.diffBalls??0));if(y.length<5)return null;const steps=y.slice(1).map((v,i)=>v-y[i]),obs=waveFeatures(points).turnRate;let extreme=0;for(let r=0;r<runs;r++){let v=y[0],series=[{value:v}];for(const s of shuffle(steps)){v+=s;series.push({value:v})}if(waveFeatures(series).turnRate>=obs)extreme++}return{observedTurnRate:obs,pValue:(extreme+1)/(runs+1),runs}}
