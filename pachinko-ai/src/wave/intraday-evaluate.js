@@ -1,0 +1,3 @@
+export function futureOutcome(current,final){const a=current?.trace?.points||[],b=final?.trace?.points||[];if(!a.length||!b.length)return null;const now=a.at(-1),end=b.at(-1);const future=b.slice(Math.max(0,a.length-1));return{fromSnapshotToClose:end-now,maxUpside:future.length?Math.max(...future)-now:null,maxDownside:future.length?Math.min(...future)-now:null,positiveClose:end>now}}
+export function evaluateCandidates(candidates,finalByMachine){const rows=[];for(const c of candidates){const final=finalByMachine[c.machineNo];const outcome=futureOutcome(c.snapshot,final);if(outcome)rows.push({...c,outcome})}return rows}
+export function precisionAtK(rows,k=10){const x=rows.slice(0,k);if(!x.length)return null;return x.filter(r=>r.outcome?.positiveClose).length/x.length}
