@@ -1,0 +1,2 @@
+import {snapshotDelta,leadLag} from './intraday.js';
+export function intradaySignals(history,neighbors=[]){if(!history||history.length<2)return{usable:false,reason:'need_2_snapshots'};const prev=history.at(-2),curr=history.at(-1),delta=snapshotDelta(prev.trace,curr.trace);const neighborSignals=neighbors.map(n=>({machineNo:n.machineNo,...leadLag(n.trace?.points||[],curr.trace?.points||[])})).filter(x=>Number.isFinite(x.corr));return{usable:true,time:curr.time,delta,neighborSignals:neighborSignals.sort((a,b)=>b.corr-a.corr).slice(0,4)}}
