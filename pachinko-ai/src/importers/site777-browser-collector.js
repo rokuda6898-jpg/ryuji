@@ -1,170 +1,148 @@
-// SITE777 collector V5 — 正規に開いた機種ページから台tokenと8日履歴を収集
-// reCAPTCHAは回避しない。SITE777で通常操作して開いたLISTページ上で実行する。
+// SITE777 collector V6 — current model page collector + validated 8-day history
+// Uses SITE777's normal page/session flow. It does not bypass reCAPTCHA.
 (async()=>{
- const wait=ms=>new Promise(r=>setTimeout(r,ms));
- const parse=s=>new DOMParser().parseFromString(s,'text/html');
- const norm=s=>(s||'').replace(/\\s+/g,' ').trim();
- const form=document.forms.HallDedamaActionForm;
- const q=new URL(location.href).searchParams;
- const hallcode=form?.hallcode?.value||q.get('hallcode')||'';
- const modelcode=form?.modelcode?.value||q.get('modelcode')||'';
- const uritanka=form?.uritanka?.value||q.get('uritanka')||'400';
- const effectiveModelcode=modelcode||document.querySelector('[name="modelcode"]')?.value||'';
- const safeSave=(obj)=>{
-   try{localStorage.setItem('SITE777_V5_RESULT',JSON.stringify(obj))}
-   catch(e){console.error('保存容量不足/保存失敗',e);throw e}
- };
- const fetchText=async(u,tries=3)=>{
-   let last;
-   for(let n=1;n<=tries;n++){
-     try{
-       const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),12000);
-       const r=await fetch(u,{credentials:'include',cache:'no-store',signal:ctl.signal});
-       clearTimeout(timer);
-       const html=await r.text();
-       if(!r.ok)throw new Error('HTTP '+r.status);
-       if(/ログイン|認証|captcha/i.test(norm(parse(html).body?.innerText||'')) && !/グラフ|大当り|台番/.test(norm(parse(html).body?.innerText||'')))
-         throw new Error('認証/ログイン画面を受信');
-       return {r,html};
-     }catch(e){last=e;if(n<tries)await wait(500*n)}
-   }
-   throw last;
- };
- // SITE777は画面/機種によってtableNumClickが<a>以外にも付くため、全要素から拾う。
- const links=[...document.querySelectorAll('[onclick]')].filter(el=>
-   /tableNumClick\\s*\\(/i.test(el.getAttribute('onclick')||'')
- );
- const machines=[];
- for(const el of links){
-   const oc=el.getAttribute('onclick')||'';
-   const tableToken=oc.match(/tableNumClick\\s*\\(\\s*['"]([^'"]+)['"]\\s*\\)/i)?.[1];
-   const scopes=[el,el.closest('tr'),el.closest('li'),el.parentElement].filter(Boolean);
-   let machineNo=null;
-   for(const s of scopes){
-     const t=norm(s.textContent);
-     machineNo=t.match(/台番[:：]?\\s*(\\d+)/)?.[1]||t.match(/^\\s*(\\d{1,4})\\s*$/)?.[1]||null;
-     if(machineNo)break;
-   }
-   if(tableToken&&machineNo)machines.push({modelcode,machineNo,tableToken,uritanka});
- }
- // 同じ台が複数要素に現れても1台に統合。
- const machineMap=new Map(machines.map(x=>[(x.modelcode||effectiveModelcode)+'|'+x.machineNo,x]));
- machines.length=0; machines.push(...machineMap.values());
- if(!machines.length){
-   const onclicks=[...document.querySelectorAll('[onclick]')].map(x=>x.getAttribute('onclick')).filter(Boolean);
-   console.error('台一覧は表示されていますが台tokenを検出できません。診断onclick=',onclicks);
-   window.SITE777_ONCLICK_DIAG=onclicks;
-   return;
- }
- const key='SITE777_V5_RESULT';
- let data; try{data=JSON.parse(localStorage.getItem(key)||'null')}catch{}
- if(!data)data={source:'site777-browser-v5',hallcode,capturedAt:new Date().toISOString(),machines:[],history:[]};
- for(const m of machines){
-   if(!data.machines.some(x=>x.modelcode===m.modelcode&&x.machineNo===m.machineNo))data.machines.push(m);
-   for(let day=0;day<8;day++){
-     if(data.history.some(x=>x.modelcode===m.modelcode&&x.machineNo===m.machineNo&&x.day===day))continue;
-     const u=new URL('/pc/GraphList.do',location.origin);
-     u.searchParams.set('hallcode',hallcode);u.searchParams.set('tablenum',m.tableToken);
-     u.searchParams.set('tablelistflag','1');u.searchParams.set('day',String(day));
-     u.searchParams.set('currentpageno','1');u.searchParams.set('uritanka',uritanka);
-     u.searchParams.set('modelcode',m.modelcode||effectiveModelcode);
-     const {r,html}=await fetchText(u,3);
-     const pageText=norm(parse(html).body?.innerText||html);
-     if(!pageText)throw new Error('GraphList本文が空です');
-     data.history.push({...m,day,url:r.url,pageText});
-     safeSave(data);
-     await wait(250);
-   }
-   console.log('台番',m.machineNo,'8日完了');
- }
- data.capturedAt=new Date().toISOString();safeSave(data);
- window.SITE777_RESULT=data;
- console.log('★★★★★ V5取得完了 ★★★★★','今回',machines.length+'台','累計',data.machines.length+'台','履歴',data.history.length+'件');
- // 次に処理する4円機種を記録。認証が必要なページ遷移自体は自動化しない。
- try{
-   const hall=(await fetchText('/pc/HallSelectLink.do?hallcode=27090002',3)).html;
-   const d=parse(hall), todo=[];
-   const expectedByModel=new Map();
-   for(const el of d.querySelectorAll('[onclick*="listClick"]')){
-     const oc=el.getAttribute('onclick')||'';
-     const mm=oc.match(/listClick\\(\\s*['"]01['"]\\s*,\\s*['"]([^'"]+)['"]\\s*,\\s*['"]([^'"]+)['"]\\s*,\\s*['"]([^'"]+)['"]\\s*,\\s*['"]([^'"]+)['"]\\s*\\)/i);
-     if(mm){
-       const row=el.closest('tr')||el.parentElement;
-       const cnt=norm(row?.textContent||'').match(/[（(](\d+)[）)]/)?.[1];
-       const item={modelcode:mm[1],edaNo:mm[2],actionType:mm[3],uritanka:mm[4],expectedMachines:cnt?+cnt:null};
-       todo.push(item); expectedByModel.set(mm[1],item.expectedMachines);
-     }
-   }
-   const completeModels=new Set();
-   for(const mc of new Set(data.machines.map(x=>x.modelcode))){
-     const ms=data.machines.filter(x=>x.modelcode===mc);
-     const expected=expectedByModel.get(mc);
-     if(ms.length && (expected==null||ms.length===expected) && ms.every(m=>[0,1,2,3,4,5,6,7].every(day=>data.history.some(h=>h.modelcode===mc&&h.machineNo===m.machineNo&&h.day===day))))
-       completeModels.add(mc);
-   }
-   data.todo=[...new Map(todo.map(x=>[x.modelcode,x])).values()].filter(x=>!completeModels.has(x.modelcode));
-   safeSave(data);
-   console.log('未取得機種',data.todo.length,'/','全4円機種',new Set(todo.map(x=>x.modelcode)).size);
- }catch(e){console.warn('未取得機種一覧の更新失敗',e)}
- // 通常のSITE777操作で次の未取得4円機種を開くヘルパー。
- // listClick()をそのまま呼ぶため、SITE777自身のreCAPTCHA/通常遷移を維持する。
- window.SITE777_NEXT=()=>{
-   const latest=JSON.parse(localStorage.getItem(key)||'{}');
-   const next=latest.todo?.[0];
-   if(!next){console.log('★★★★★ 未取得機種なし ★★★★★');return}
-   if(typeof window.listClick!=='function'){
-     console.log('ホール機種一覧ページへ戻って SITE777_NEXT() を実行してください');
-     return;
-   }
-   console.log('次の未取得機種を通常遷移で開きます:',next.modelcode);
-   sessionStorage.setItem('SITE777_V5_AUTORUN','1');
-   window.listClick('01',next.modelcode,next.edaNo,next.actionType,next.uritanka);
- };
- // コンソール貼り付けを毎機種繰り返さないためのブックマークレット用入口。
- // このスクリプトを各ページで再注入できる環境では AUTORUN フラグを見て自動収集する。
- window.SITE777_AUTORUN=()=>{
-   sessionStorage.setItem('SITE777_V5_AUTORUN','1');
-   if(links.length) console.log('AUTORUN開始: 現在機種の取得後、一覧でSITE777_NEXT()を実行できます');
-   else if(typeof window.SITE777_NEXT==='function') window.SITE777_NEXT();
- };
- // ホール一覧へ戻るURL。次機種は一覧上でSITE777_NEXT()を呼ぶ。
- window.SITE777_BACK_TO_HALL=()=>{
-   sessionStorage.setItem('SITE777_V5_AUTORUN','1');
-   location.href='/pc/HallSelectLink.do?hallcode=27090002';
- };
- window.SITE777_CONTINUE=()=>{
-   const x=JSON.parse(localStorage.getItem(key)||'{}');
-   if(!(x.todo?.length)){console.log('★★★★★ 全機種処理済み ★★★★★');return}
-   if(typeof window.listClick==='function') return window.SITE777_NEXT();
-   return window.SITE777_BACK_TO_HALL();
- };
- window.SITE777_STATUS=()=>{
-   const x=JSON.parse(localStorage.getItem(key)||'{}');
-   console.log('累計台数',x.machines?.length||0,'履歴',x.history?.length||0,'未取得機種',x.todo?.length??'?');
-   return x;
- };
- window.SITE777_RESET=()=>{
-   localStorage.removeItem(key);
-   sessionStorage.removeItem('SITE777_V5_AUTORUN');
-   console.log('SITE777 V5 保存データをリセットしました');
- };
- window.SITE777_EXPORT=()=>{
-   const latest=JSON.parse(localStorage.getItem(key)||JSON.stringify(data));
-   const expected=(latest.machines?.length||0)*8;
-   const actual=latest.history?.length||0;
-   const missing=[];
-   for(const m of latest.machines||[])for(let day=0;day<8;day++)
-     if(!(latest.history||[]).some(h=>h.modelcode===m.modelcode&&h.machineNo===m.machineNo&&h.day===day))
-       missing.push({modelcode:m.modelcode,machineNo:m.machineNo,day});
-   latest.validation={expectedHistory:expected,actualHistory:actual,missingHistory:missing.length,remainingModels:latest.todo?.length??null,ok:missing.length===0&&(latest.todo?.length??1)===0};
-   safeSave(latest);
-   console.log('★★★★★ 最終検証 ★★★★★',latest.validation);
-   if(missing.length)console.table(missing);
-   const b=new Blob([JSON.stringify(latest,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='site777-v5-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';a.click()
- };
- if(sessionStorage.getItem('SITE777_V5_AUTORUN')==='1'){
-   console.log('SITE777 V5 AUTORUN 有効');
-   // 現在ページの収集は上で完了済み。次の操作を1関数に統一。
-   console.log('続行は SITE777_CONTINUE()');
- }
+  'use strict';
+  const VERSION='6.0.0', KEY='SITE777_V6_RESULT';
+  const wait=ms=>new Promise(r=>setTimeout(r,ms));
+  const norm=s=>(s||'').replace(/\s+/g,' ').trim();
+  const parse=s=>new DOMParser().parseFromString(s,'text/html');
+  const uniq=(a,key)=>[...new Map(a.map(x=>[key(x),x])).values()];
+  const form=document.forms.HallDedamaActionForm;
+  const q=new URL(location.href).searchParams;
+  const field=n=>form?.elements?.[n]?.value||document.querySelector(`[name="${n}"]`)?.value||q.get(n)||'';
+  const hallcode=field('hallcode');
+  const modelcode=field('modelcode');
+  const uritanka=field('uritanka')||'400';
+  const modelName=norm(document.querySelector('h1,h2,h3,.modelName,.model-name')?.textContent||document.title);
+  if(!hallcode) throw new Error('hallcodeを取得できません');
+  if(!modelcode) console.warn('modelcodeが空です。台要素/URLから補完を試します');
+
+  let data;
+  try{data=JSON.parse(localStorage.getItem(KEY)||'null')}catch{}
+  if(!data||data.schemaVersion!==2) data={schemaVersion:2,collectorVersion:VERSION,source:'site777-browser',createdAt:new Date().toISOString(),updatedAt:null,hall:{sessionHallcode:hallcode},models:{},machines:[],history:[],failures:[],todo:[]};
+
+  const save=()=>{
+    data.updatedAt=new Date().toISOString();
+    try{localStorage.setItem(KEY,JSON.stringify(data))}
+    catch(e){console.error('保存失敗（容量不足の可能性）',e);throw e}
+  };
+  const fetchText=async(url,tries=3)=>{
+    let last;
+    for(let n=1;n<=tries;n++){
+      const ctl=new AbortController(), timer=setTimeout(()=>ctl.abort(),15000);
+      try{
+        const r=await fetch(url,{credentials:'include',cache:'no-store',signal:ctl.signal});
+        const html=await r.text(); clearTimeout(timer);
+        if(!r.ok) throw new Error('HTTP '+r.status);
+        const text=norm(parse(html).body?.innerText||html);
+        if(text.length<40) throw new Error('応答本文が短すぎます');
+        if(/ログイン|認証|captcha/i.test(text)&&!/大当り|初当り|グラフ|台番/.test(text)) throw new Error('認証/ログイン画面を受信');
+        return {r,html,text};
+      }catch(e){clearTimeout(timer);last=e;if(n<tries)await wait(750*n)}
+    }
+    throw last;
+  };
+
+  // <a>限定にしない。onclickを持つ全要素から台tokenを抽出。
+  const clickable=[...document.querySelectorAll('[onclick]')].filter(el=>/tableNumClick\s*\(/i.test(el.getAttribute('onclick')||''));
+  const machines=[];
+  for(const el of clickable){
+    const oc=el.getAttribute('onclick')||'';
+    const token=oc.match(/tableNumClick\s*\(\s*['"]([^'"]+)['"]\s*\)/i)?.[1];
+    const row=el.closest('tr');
+    const texts=[el.textContent,el.value,row?.textContent,row?.cells?.[0]?.textContent].map(norm).filter(Boolean);
+    let no=null;
+    for(const t of texts){
+      no=t.match(/台番[:：]?\s*(\d+)/)?.[1]||t.match(/^\D*(\d{1,4})\D*$/)?.[1]||null;
+      if(no)break;
+    }
+    if(token&&no) machines.push({modelcode,machineNo:no,tableToken:token,uritanka,modelName});
+  }
+  const current=uniq(machines,x=>`${x.modelcode}|${x.machineNo}|${x.tableToken}`);
+  if(!current.length){
+    console.error('台一覧は表示されていますが台tokenを検出できません');
+    window.SITE777_DIAG=[...document.querySelectorAll('[onclick]')].map(x=>x.getAttribute('onclick')).filter(Boolean);
+    return;
+  }
+
+  data.machines=uniq([...data.machines,...current],x=>`${x.modelcode}|${x.machineNo}`);
+  data.models[modelcode||'unknown']={modelcode:modelcode||null,modelName,observedMachines:current.length,lastSeen:new Date().toISOString()};
+  save();
+
+  // 既存重複を正規化してから不足日だけ取得。
+  data.history=uniq(data.history||[],x=>`${x.modelcode}|${x.machineNo}|${x.day}`);
+  for(const m of current){
+    for(let day=0;day<8;day++){
+      const hk=`${m.modelcode}|${m.machineNo}|${day}`;
+      if(data.history.some(x=>`${x.modelcode}|${x.machineNo}|${x.day}`===hk)) continue;
+      const u=new URL('/pc/GraphList.do',location.origin);
+      u.searchParams.set('hallcode',hallcode);
+      u.searchParams.set('tablenum',m.tableToken);
+      u.searchParams.set('tablelistflag','1');
+      u.searchParams.set('day',String(day));
+      u.searchParams.set('currentpageno','1');
+      u.searchParams.set('uritanka',m.uritanka||uritanka);
+      u.searchParams.set('modelcode',m.modelcode||modelcode);
+      try{
+        const {r,text}=await fetchText(u,3);
+        if(!/大当り|初当り|グラフ|スタート|台番/.test(text)) throw new Error('GraphListらしい本文を確認できません');
+        data.history.push({...m,day,url:r.url,pageText:text,capturedAt:new Date().toISOString()});
+        data.failures=(data.failures||[]).filter(x=>!(x.modelcode===m.modelcode&&x.machineNo===m.machineNo&&x.day===day));
+        save();
+      }catch(e){
+        data.failures=uniq([...(data.failures||[]),{modelcode:m.modelcode,machineNo:m.machineNo,day,error:String(e),at:new Date().toISOString()}],x=>`${x.modelcode}|${x.machineNo}|${x.day}`);
+        save(); console.error('取得失敗',m.machineNo,'day',day,e);
+      }
+      await wait(300);
+    }
+  }
+
+  // ホール一覧を現在セッションのhallcode優先で取得。失敗時のみ公開hallcodeへフォールバック。
+  let hallHtml=null;
+  for(const hc of uniq([hallcode,'27090002'],x=>x)){
+    try{hallHtml=(await fetchText('/pc/HallSelectLink.do?hallcode='+encodeURIComponent(hc),2)).html;break}catch{}
+  }
+  if(hallHtml){
+    const d=parse(hallHtml), all=[];
+    for(const el of d.querySelectorAll('[onclick*="listClick"]')){
+      const oc=el.getAttribute('onclick')||'';
+      const mm=oc.match(/listClick\(\s*['"]01['"]\s*,\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]\s*\)/i);
+      if(!mm)continue;
+      const txt=norm((el.closest('tr')||el.parentElement)?.textContent||el.textContent);
+      const expected=txt.match(/[（(](\d+)[）)]/)?.[1];
+      all.push({modelcode:mm[1],edaNo:mm[2],actionType:mm[3],uritanka:mm[4],expectedMachines:expected?+expected:null,name:norm(el.textContent)});
+    }
+    const models=uniq(all,x=>x.modelcode);
+    const complete=new Set();
+    for(const x of models){
+      const ms=data.machines.filter(m=>m.modelcode===x.modelcode);
+      const countOK=x.expectedMachines==null?ms.length>0:ms.length===x.expectedMachines;
+      const daysOK=ms.length>0&&ms.every(m=>[0,1,2,3,4,5,6,7].every(day=>data.history.some(h=>h.modelcode===m.modelcode&&h.machineNo===m.machineNo&&h.day===day)));
+      if(countOK&&daysOK)complete.add(x.modelcode);
+    }
+    data.todo=models.filter(x=>!complete.has(x.modelcode));
+    data.expectedModels=models.length;
+    save();
+  }
+
+  const validation=()=>{
+    const missing=[];
+    for(const m of data.machines)for(let day=0;day<8;day++)if(!data.history.some(h=>h.modelcode===m.modelcode&&h.machineNo===m.machineNo&&h.day===day))missing.push({modelcode:m.modelcode,machineNo:m.machineNo,day});
+    return {modelsSeen:Object.keys(data.models).length,expectedModels:data.expectedModels??null,machines:data.machines.length,history:data.history.length,expectedHistory:data.machines.length*8,missingHistory:missing.length,failures:(data.failures||[]).length,remainingModels:data.todo?.length??null,ok:missing.length===0&&(data.failures||[]).length===0&&(data.todo?.length??1)===0,missing};
+  };
+  window.SITE777_STATUS=()=>{const v=validation();console.log(v);return v};
+  window.SITE777_NEXT=()=>{
+    const next=data.todo?.[0]; if(!next){console.log('未取得機種なし');return}
+    if(typeof window.listClick!=='function'){console.log('ホール機種一覧ページで実行してください');return}
+    window.listClick('01',next.modelcode,next.edaNo,next.actionType,next.uritanka);
+  };
+  window.SITE777_EXPORT=()=>{
+    const v=validation(); data.validation=v; save();
+    if(!v.ok){console.error('未完成のため完全取得扱いにはしません',v);return}
+    const b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='site777-v6-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  };
+  window.SITE777_RESET=()=>{localStorage.removeItem(KEY);console.log('V6保存データをリセットしました')};
+  console.log('SITE777 V6 完了',SITE777_STATUS());
+  console.log('注意: 通常コンソール貼付コードはページ遷移後に自動再注入されません。次機種はSITE777_NEXT()で通常遷移し、V6を再実行してください。');
 })();
