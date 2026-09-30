@@ -9,6 +9,21 @@
  const hallcode=form?.hallcode?.value||q.get('hallcode')||'';
  const modelcode=form?.modelcode?.value||q.get('modelcode')||'';
  const uritanka=form?.uritanka?.value||q.get('uritanka')||'400';
+ const effectiveModelcode=modelcode||document.querySelector('[name="modelcode"]')?.value||'';
+ const fetchText=async(u,tries=3)=>{
+   let last;
+   for(let n=1;n<=tries;n++){
+     try{
+       const r=await fetch(u,{credentials:'include',cache:'no-store'});
+       const html=await r.text();
+       if(!r.ok)throw new Error('HTTP '+r.status);
+       if(/ログイン|認証|captcha/i.test(norm(parse(html).body?.innerText||'')) && !/グラフ|大当り|台番/.test(norm(parse(html).body?.innerText||'')))
+         throw new Error('認証/ログイン画面を受信');
+       return {r,html};
+     }catch(e){last=e;if(n<tries)await wait(500*n)}
+   }
+   throw last;
+ };
  // SITE777は画面/機種によってtableNumClickが<a>以外にも付くため、全要素から拾う。
  const links=[...document.querySelectorAll('[onclick]')].filter(el=>
    /tableNumClick\\s*\\(/i.test(el.getAttribute('onclick')||'')
@@ -46,12 +61,13 @@
      u.searchParams.set('hallcode',hallcode);u.searchParams.set('tablenum',m.tableToken);
      u.searchParams.set('tablelistflag','1');u.searchParams.set('day',String(day));
      u.searchParams.set('currentpageno','1');u.searchParams.set('uritanka',uritanka);
-     u.searchParams.set('modelcode',modelcode);
-     const r=await fetch(u,{credentials:'include',cache:'no-store'});
-     const html=await r.text();
-     data.history.push({...m,day,url:r.url,pageText:norm(parse(html).body?.innerText||html)});
+     u.searchParams.set('modelcode',m.modelcode||effectiveModelcode);
+     const {r,html}=await fetchText(u,3);
+     const pageText=norm(parse(html).body?.innerText||html);
+     if(!pageText)throw new Error('GraphList本文が空です');
+     data.history.push({...m,day,url:r.url,pageText});
      localStorage.setItem(key,JSON.stringify(data));
-     await wait(100);
+     await wait(250);
    }
    console.log('台番',m.machineNo,'8日完了');
  }
@@ -60,15 +76,20 @@
  console.log('★★★★★ V5取得完了 ★★★★★','今回',machines.length+'台','累計',data.machines.length+'台','履歴',data.history.length+'件');
  // 次に処理する4円機種を記録。認証が必要なページ遷移自体は自動化しない。
  try{
-   const hall=await fetch('/pc/HallSelectLink.do?hallcode=27090002',{credentials:'include',cache:'no-store'}).then(r=>r.text());
+   const hall=(await fetchText('/pc/HallSelectLink.do?hallcode=27090002',3)).html;
    const d=parse(hall), todo=[];
    for(const el of d.querySelectorAll('[onclick*="listClick"]')){
      const oc=el.getAttribute('onclick')||'';
      const mm=oc.match(/listClick\\(\\s*['"]01['"]\\s*,\\s*['"]([^'"]+)['"]\\s*,\\s*['"]([^'"]+)['"]\\s*,\\s*['"]([^'"]+)['"]\\s*,\\s*['"]([^'"]+)['"]\\s*\\)/i);
      if(mm)todo.push({modelcode:mm[1],edaNo:mm[2],actionType:mm[3],uritanka:mm[4]});
    }
-   const done=new Set(data.machines.map(x=>x.modelcode));
-   data.todo=[...new Map(todo.map(x=>[x.modelcode,x])).values()].filter(x=>!done.has(x.modelcode));
+   const completeModels=new Set();
+   for(const mc of new Set(data.machines.map(x=>x.modelcode))){
+     const ms=data.machines.filter(x=>x.modelcode===mc);
+     if(ms.length && ms.every(m=>[0,1,2,3,4,5,6,7].every(day=>data.history.some(h=>h.modelcode===mc&&h.machineNo===m.machineNo&&h.day===day))))
+       completeModels.add(mc);
+   }
+   data.todo=[...new Map(todo.map(x=>[x.modelcode,x])).values()].filter(x=>!completeModels.has(x.modelcode));
    localStorage.setItem(key,JSON.stringify(data));
    console.log('未取得機種',data.todo.length,'/','全4円機種',new Set(todo.map(x=>x.modelcode)).size);
  }catch(e){console.warn('未取得機種一覧の更新失敗',e)}
