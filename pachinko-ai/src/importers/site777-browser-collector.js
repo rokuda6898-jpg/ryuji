@@ -43,5 +43,19 @@
  data.capturedAt=new Date().toISOString();localStorage.setItem(key,JSON.stringify(data));
  window.SITE777_RESULT=data;
  console.log('★★★★★ V5取得完了 ★★★★★','今回',machines.length+'台','累計',data.machines.length+'台','履歴',data.history.length+'件');
+ // 次に処理する4円機種を記録。認証が必要なページ遷移自体は自動化しない。
+ try{
+   const hall=await fetch('/pc/HallSelectLink.do?hallcode=27090002',{credentials:'include',cache:'no-store'}).then(r=>r.text());
+   const d=parse(hall), todo=[];
+   for(const el of d.querySelectorAll('[onclick*="listClick"]')){
+     const oc=el.getAttribute('onclick')||'';
+     const mm=oc.match(/listClick\\(\\s*['"]01['"]\\s*,\\s*['"]([^'"]+)['"]\\s*,\\s*['"]([^'"]+)['"]\\s*,\\s*['"]([^'"]+)['"]\\s*,\\s*['"]([^'"]+)['"]\\s*\\)/i);
+     if(mm)todo.push({modelcode:mm[1],edaNo:mm[2],actionType:mm[3],uritanka:mm[4]});
+   }
+   const done=new Set(data.machines.map(x=>x.modelcode));
+   data.todo=[...new Map(todo.map(x=>[x.modelcode,x])).values()].filter(x=>!done.has(x.modelcode));
+   localStorage.setItem(key,JSON.stringify(data));
+   console.log('未取得機種',data.todo.length,'/','全4円機種',new Set(todo.map(x=>x.modelcode)).size);
+ }catch(e){console.warn('未取得機種一覧の更新失敗',e)}
  window.SITE777_EXPORT=()=>{const b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='site777-v5-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';a.click()};
 })();
