@@ -1,4 +1,4 @@
-// SITE777 ARROW 天理店 4円パチ全台 collector V4
+// SITE777 ARROW 天理店 4円パチ全台 collector V4.1
 // HallSelectLink.do（ログイン済み）で Console に実行。
 // 設置機種HTMLの listClick() を直接解析し、SITE777自身の HallDedamaLogin.do POST で各機種を取得する。
 (async()=>{
@@ -63,6 +63,12 @@
  }
  const uniqueMachines=[...new Map(machines.map(x=>[x.modelcode+'|'+x.machineNo,x])).values()];
  console.log('★★★★★ 全台token',uniqueMachines.length,'台 ★★★★★');
+ if(!uniqueMachines.length){
+   const diag={models:uniqModels,action:action.href,hallcode,note:'機種抽出は成功。機種ページ遷移がSITE777認証フローで止まっています。'};
+   window.SITE777_DIAG=diag;
+   console.error('台token 0。履歴取得を中止。SITE777_DIAG に診断情報を保存しました。');
+   return;
+ }
 
  for(let i=0;i<uniqueMachines.length;i++){
    const x=uniqueMachines[i];
