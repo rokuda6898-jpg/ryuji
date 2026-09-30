@@ -1,6 +1,6 @@
-// SITE777 collector V7.0 — compact, resumable, strict completeness validation
+// SITE777 collector V7.1 — compact, resumable, strict completeness validation
 (async()=>{'use strict';
-const VERSION='7.0.0',KEY='SITE777_V7_RESULT',DAYS=[0,1,2,3,4,5,6,7];
+const VERSION='7.1.0',KEY='SITE777_V7_RESULT',DAYS=[0,1,2,3,4,5,6,7];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms)),norm=s=>(s||'').replace(/\s+/g,' ').trim(),parse=s=>new DOMParser().parseFromString(s,'text/html');
 const q=new URL(location.href).searchParams,form=document.forms.HallDedamaActionForm||document.querySelector('form');
 const val=n=>{const e=form?.elements?.namedItem?.(n)||document.querySelector('[name="'+n+'"]');return(e&&'value'in e?e.value:'')||q.get(n)||''};
@@ -26,6 +26,7 @@ const validation=()=>{const catalog=Object.values(db.catalog),missing=[],badCoun
 window.SITE777_STATUS=()=>{const v=validation();console.log(v);return v};
 window.SITE777_NEXT=()=>{validation();const n=db.todo[0];if(!n)return console.log('未取得機種なし');if(typeof window.listClick!=='function')return console.log('ホール機種一覧ページで実行してください');window.listClick('01',n.modelcode,n.edaNo,n.actionType,n.uritanka)};
 window.SITE777_EXPORT=()=>{const v=validation();if(!v.ok)return console.error('未完成。完全取得扱いにはしません',v);db.validation=v;save();const b=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='site777-v7-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+window.SITE777_PAID_TEST=async()=>{const ms=Object.values(cur);if(!ms.length)throw Error('台データなし');const m=ms[0],out=[];for(const day of DAYS){const u=new URL('/pc/GraphList.do',location.origin);Object.entries({hallcode,tablenum:m.tableToken,tablelistflag:'1',day:String(day),currentpageno:'1',uritanka:m.uritanka,modelcode:m.modelcode}).forEach(([a,b])=>u.searchParams.set(a,b));try{const{x,text}=await (async()=>{const z=await fetchText(u,2);return{x:z.r,text:z.text}})();const valid=!/エラーが発生|該当するデータがありません|データがありません/.test(text)&&/大当り|初当り|グラフ|スタート|台番/.test(text);out.push({day,ok:valid,status:x.status,url:x.url,stats:valid?stats(text):{}})}catch(e){out.push({day,ok:false,error:String(e)})}}const ok=out.every(x=>x.ok);const result={modelcode:modelcode,modelName:title(),machineNo:m.machineNo,days:out,all8DaysAccessible:ok,verdict:ok?'この機種は8日分取得可能':'この機種は8日分取得不可または権限制限'};window.SITE777_PAID_TEST_RESULT=result;console.table(out);console.log(result.verdict,result);return result};
 window.SITE777_RESET=()=>{localStorage.removeItem(KEY);console.log('V7リセット完了')};
 console.log('SITE777 V7',SITE777_STATUS());
 console.log('ページ遷移後はブラウザ仕様上この貼付コード自体は残りません。reCAPTCHAを回避せず次機種へ進む場合はSITE777_NEXT()を使用してください。');
