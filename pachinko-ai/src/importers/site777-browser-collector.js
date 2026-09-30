@@ -78,6 +78,17 @@
    if(links.length) console.log('AUTORUN開始: 現在機種の取得後、一覧でSITE777_NEXT()を実行できます');
    else if(typeof window.SITE777_NEXT==='function') window.SITE777_NEXT();
  };
+ // ホール一覧へ戻るURL。次機種は一覧上でSITE777_NEXT()を呼ぶ。
+ window.SITE777_BACK_TO_HALL=()=>{
+   sessionStorage.setItem('SITE777_V5_AUTORUN','1');
+   location.href='/pc/HallSelectLink.do?hallcode=27090002';
+ };
+ window.SITE777_CONTINUE=()=>{
+   const x=JSON.parse(localStorage.getItem(key)||'{}');
+   if(!(x.todo?.length)){console.log('★★★★★ 全機種処理済み ★★★★★');return}
+   if(typeof window.listClick==='function') return window.SITE777_NEXT();
+   return window.SITE777_BACK_TO_HALL();
+ };
  window.SITE777_STATUS=()=>{
    const x=JSON.parse(localStorage.getItem(key)||'{}');
    console.log('累計台数',x.machines?.length||0,'履歴',x.history?.length||0,'未取得機種',x.todo?.length??'?');
@@ -86,5 +97,7 @@
  window.SITE777_EXPORT=()=>{const b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='site777-v5-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';a.click()};
  if(sessionStorage.getItem('SITE777_V5_AUTORUN')==='1'){
    console.log('SITE777 V5 AUTORUN 有効');
+   // 現在ページの収集は上で完了済み。次の操作を1関数に統一。
+   console.log('続行は SITE777_CONTINUE()');
  }
 })();
