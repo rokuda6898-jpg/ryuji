@@ -9,17 +9,32 @@
  const hallcode=form?.hallcode?.value||q.get('hallcode')||'';
  const modelcode=form?.modelcode?.value||q.get('modelcode')||'';
  const uritanka=form?.uritanka?.value||q.get('uritanka')||'400';
- const links=[...document.querySelectorAll('a[onclick*="tableNumClick"]')];
- if(!links.length){
-   console.log('SITE777 V5: このページは台一覧ではありません。通常操作で4円機種を開いてから再実行してください。');
+ // SITE777は画面/機種によってtableNumClickが<a>以外にも付くため、全要素から拾う。
+ const links=[...document.querySelectorAll('[onclick]')].filter(el=>
+   /tableNumClick\\s*\\(/i.test(el.getAttribute('onclick')||'')
+ );
+ const machines=[];
+ for(const el of links){
+   const oc=el.getAttribute('onclick')||'';
+   const tableToken=oc.match(/tableNumClick\\s*\\(\\s*['"]([^'"]+)['"]\\s*\\)/i)?.[1];
+   const scopes=[el,el.closest('tr'),el.closest('li'),el.parentElement].filter(Boolean);
+   let machineNo=null;
+   for(const s of scopes){
+     const t=norm(s.textContent);
+     machineNo=t.match(/台番[:：]?\\s*(\\d+)/)?.[1]||t.match(/^\\s*(\\d{1,4})\\s*$/)?.[1]||null;
+     if(machineNo)break;
+   }
+   if(tableToken&&machineNo)machines.push({modelcode,machineNo,tableToken,uritanka});
+ }
+ // 同じ台が複数要素に現れても1台に統合。
+ const machineMap=new Map(machines.map(x=>[x.machineNo,x]));
+ machines.length=0; machines.push(...machineMap.values());
+ if(!machines.length){
+   const onclicks=[...document.querySelectorAll('[onclick]')].map(x=>x.getAttribute('onclick')).filter(Boolean);
+   console.error('台一覧は表示されていますが台tokenを検出できません。診断onclick=',onclicks);
+   window.SITE777_ONCLICK_DIAG=onclicks;
    return;
  }
- const machines=links.map(a=>{
-   const oc=a.getAttribute('onclick')||'';
-   const tableToken=oc.match(/tableNumClick\\(['"]([^'"]+)['"]\\)/i)?.[1];
-   const machineNo=norm(a.textContent).match(/台番[:：]?\\s*(\\d+)/)?.[1];
-   return tableToken&&machineNo?{modelcode,machineNo,tableToken,uritanka}:null;
- }).filter(Boolean);
  const key='SITE777_V5_RESULT';
  let data; try{data=JSON.parse(localStorage.getItem(key)||'null')}catch{}
  if(!data)data={source:'site777-browser-v5',hallcode,capturedAt:new Date().toISOString(),machines:[],history:[]};
