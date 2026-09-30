@@ -1,7 +1,7 @@
 // SITE777 browser-session collector: discovers models from modelClick/modelcode and machines from tableNumClick.
 (async()=>{
  const wait=ms=>new Promise(r=>setTimeout(r,ms)),seed=new URL(location.href),seen=new Set(),q=[],models=[],machines=[],history=[];
- const addModel=(code,name='')=>{if(!code)return;const u=new URL('/do/D4300.do',location.origin);for(const k of ['pmc','bn','pan','urt','dsgk','dtdd','bmdn','bmmdc','bmbn','bmurt','bmurtHji','bmgk','bmclc','bmsk'])if(seed.searchParams.has(k))u.searchParams.set(k,seed.searchParams.get(k));u.searchParams.set('mdc',code);const s=u.href;if(!seen.has(s)&&!q.includes(s))q.push(s)};
+ const addModel=(code,name='')=>{if(!code)return;const u=new URL('/pc/D4300.do',location.origin);for(const k of ['pmc','bn','pan','urt','dsgk','dtdd','bmdn','bmmdc','bmbn','bmurt','bmurtHji','bmgk','bmclc','bmsk'])if(seed.searchParams.has(k))u.searchParams.set(k,seed.searchParams.get(k));u.searchParams.set('mdc',code);const s=u.href;if(!seen.has(s)&&!q.includes(s))q.push(s)};
  const discover=html=>{
   let m;
   for(const re of [/modelClick\(['"]01['"]\s*,\s*['"]([^'"]+)['"]\)[\s\S]{0,300}?>([^<]+)<\/a>/gi,/(?:modelcode|mdc)=([0-9A-Za-z_-]+)[^"'<>]*[\s\S]{0,250}?>([^<]+)<\/a>/gi])while((m=re.exec(html)))addModel(m[1],m[2]);
