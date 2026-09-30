@@ -2,7 +2,7 @@
 // Uses SITE777's normal page/session flow. It does not bypass reCAPTCHA.
 (async()=>{
   'use strict';
-  const VERSION='6.0.0', KEY='SITE777_V6_RESULT';
+  const VERSION='6.1.0', KEY='SITE777_V6_RESULT';
   const wait=ms=>new Promise(r=>setTimeout(r,ms));
   const norm=s=>(s||'').replace(/\s+/g,' ').trim();
   const parse=s=>new DOMParser().parseFromString(s,'text/html');
@@ -11,11 +11,15 @@
   const q=new URL(location.href).searchParams;
   const field=n=>form?.elements?.[n]?.value||document.querySelector(`[name="${n}"]`)?.value||q.get(n)||'';
   const hallcode=field('hallcode');
-  const modelcode=field('modelcode');
+  let modelcode=field('modelcode');
   const uritanka=field('uritanka')||'400';
   const modelName=norm(document.querySelector('h1,h2,h3,.modelName,.model-name')?.textContent||document.title);
   if(!hallcode) throw new Error('hallcodeを取得できません');
-  if(!modelcode) console.warn('modelcodeが空です。台要素/URLから補完を試します');
+  if(!modelcode){
+    const src=document.documentElement.innerHTML;
+    modelcode=src.match(/modelcode[=:][^0-9]*([0-9]{6})/i)?.[1]||'';
+  }
+  if(!modelcode) throw new Error('modelcodeを取得できません');
 
   let data;
   try{data=JSON.parse(localStorage.getItem(KEY)||'null')}catch{}
@@ -65,7 +69,8 @@
     return;
   }
 
-  data.machines=uniq([...data.machines,...current],x=>`${x.modelcode}|${x.machineNo}`);
+  // 同一機種・台番でtokenが更新された場合は新しいtokenを優先。
+  data.machines=uniq([...data.machines.filter(x=>!current.some(n=>n.modelcode===x.modelcode&&n.machineNo===x.machineNo)),...current],x=>`${x.modelcode}|${x.machineNo}`);
   data.models[modelcode||'unknown']={modelcode:modelcode||null,modelName,observedMachines:current.length,lastSeen:new Date().toISOString()};
   save();
 
@@ -86,6 +91,7 @@
       try{
         const {r,text}=await fetchText(u,3);
         if(!/大当り|初当り|グラフ|スタート|台番/.test(text)) throw new Error('GraphListらしい本文を確認できません');
+        if(/エラーが発生|該当するデータがありません|データがありません/.test(text)) throw new Error('GraphListがエラー/データなしを返しました');
         data.history.push({...m,day,url:r.url,pageText:text,capturedAt:new Date().toISOString()});
         data.failures=(data.failures||[]).filter(x=>!(x.modelcode===m.modelcode&&x.machineNo===m.machineNo&&x.day===day));
         save();
@@ -116,19 +122,22 @@
     const complete=new Set();
     for(const x of models){
       const ms=data.machines.filter(m=>m.modelcode===x.modelcode);
-      const countOK=x.expectedMachines==null?ms.length>0:ms.length===x.expectedMachines;
+      const countOK=x.expectedMachines==null?false:ms.length===x.expectedMachines;
       const daysOK=ms.length>0&&ms.every(m=>[0,1,2,3,4,5,6,7].every(day=>data.history.some(h=>h.modelcode===m.modelcode&&h.machineNo===m.machineNo&&h.day===day)));
       if(countOK&&daysOK)complete.add(x.modelcode);
     }
     data.todo=models.filter(x=>!complete.has(x.modelcode));
     data.expectedModels=models.length;
+    data.expectedMachines=models.reduce((s,x)=>s+(x.expectedMachines||0),0);
     save();
   }
 
   const validation=()=>{
     const missing=[];
     for(const m of data.machines)for(let day=0;day<8;day++)if(!data.history.some(h=>h.modelcode===m.modelcode&&h.machineNo===m.machineNo&&h.day===day))missing.push({modelcode:m.modelcode,machineNo:m.machineNo,day});
-    return {modelsSeen:Object.keys(data.models).length,expectedModels:data.expectedModels??null,machines:data.machines.length,history:data.history.length,expectedHistory:data.machines.length*8,missingHistory:missing.length,failures:(data.failures||[]).length,remainingModels:data.todo?.length??null,ok:missing.length===0&&(data.failures||[]).length===0&&(data.todo?.length??1)===0,missing};
+    const expectedMachines=data.expectedMachines??null;
+    const machineCountOK=expectedMachines!==null&&data.machines.length===expectedMachines;
+    return {modelsSeen:Object.keys(data.models).length,expectedModels:data.expectedModels??null,machines:data.machines.length,expectedMachines,machineCountOK,history:data.history.length,expectedHistory:expectedMachines===null?null:expectedMachines*8,missingHistory:missing.length,failures:(data.failures||[]).length,remainingModels:data.todo?.length??null,ok:machineCountOK&&missing.length===0&&(data.failures||[]).length===0&&(data.todo?.length??1)===0,missing};
   };
   window.SITE777_STATUS=()=>{const v=validation();console.log(v);return v};
   window.SITE777_NEXT=()=>{
