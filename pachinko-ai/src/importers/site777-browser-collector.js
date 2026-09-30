@@ -68,7 +68,15 @@
      return;
    }
    console.log('次の未取得機種を通常遷移で開きます:',next.modelcode);
+   sessionStorage.setItem('SITE777_V5_AUTORUN','1');
    window.listClick('01',next.modelcode,next.edaNo,next.actionType,next.uritanka);
+ };
+ // コンソール貼り付けを毎機種繰り返さないためのブックマークレット用入口。
+ // このスクリプトを各ページで再注入できる環境では AUTORUN フラグを見て自動収集する。
+ window.SITE777_AUTORUN=()=>{
+   sessionStorage.setItem('SITE777_V5_AUTORUN','1');
+   if(links.length) console.log('AUTORUN開始: 現在機種の取得後、一覧でSITE777_NEXT()を実行できます');
+   else if(typeof window.SITE777_NEXT==='function') window.SITE777_NEXT();
  };
  window.SITE777_STATUS=()=>{
    const x=JSON.parse(localStorage.getItem(key)||'{}');
@@ -76,4 +84,7 @@
    return x;
  };
  window.SITE777_EXPORT=()=>{const b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='site777-v5-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';a.click()};
+ if(sessionStorage.getItem('SITE777_V5_AUTORUN')==='1'){
+   console.log('SITE777 V5 AUTORUN 有効');
+ }
 })();
