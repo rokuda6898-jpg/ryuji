@@ -1,4 +1,4 @@
-// SITE777 ARROW 天理店 4円パチ全台 collector V4.1
+// SITE777 ARROW 天理店 4円パチ全台 collector V5
 // HallSelectLink.do（ログイン済み）で Console に実行。
 // 設置機種HTMLの listClick() を直接解析し、SITE777自身の HallDedamaLogin.do POST で各機種を取得する。
 (async()=>{
@@ -45,9 +45,12 @@
      }
      p.set('kindcode','01'); p.set('modelcode',x.modelcode); p.set('edano',x.edaNo);
      p.set('actiontype',x.actionType); p.set('forward','LIST'); p.set('hallcode',hallcode); p.set('uritanka',x.uritanka);
-     const r=await fetch(action,{method:'POST',credentials:'include',cache:'no-store',
+     // LISTはreCAPTCHA対象。自動回避はせず、サイト自身が通常submitしている
+     // SEARCH経路を先に使う（selectClick()と同じ正規フロー）。
+     p.set('forward','SEARCH');
+     let r=await fetch(action,{method:'POST',credentials:'include',cache:'no-store',
        headers:{'Content-Type':'application/x-www-form-urlencoded'},body:p});
-     const html=await r.text(), d=parse(html);
+     let html=await r.text(), d=parse(html);
      const found=[];
      for(const a of d.querySelectorAll('[onclick*="tableNumClick"]')){
        const token=(a.getAttribute('onclick')||'').match(/tableNumClick\(['"]([^'"]+)['"]\)/i)?.[1];
@@ -87,7 +90,7 @@
    console.log('履歴 ['+(i+1)+'/'+uniqueMachines.length+'] 台番',x.machineNo);
  }
  const missing=uniqModels.filter(x=>x.expectedMachines!=null&&x.machines!==x.expectedMachines);
- const data={source:'site777-browser-v4',hallcode,capturedAt:new Date().toISOString(),models:uniqModels,machines:uniqueMachines,history};
+ const data={source:'site777-browser-v5',hallcode,capturedAt:new Date().toISOString(),models:uniqModels,machines:uniqueMachines,history};
  window.SITE777_RESULT=data;
  console.log('★★★★ 全取得完了 ★★★★','機種',uniqModels.length,'台数',uniqueMachines.length,'履歴',history.length,'不足機種',missing.length);
  if(missing.length)console.table(missing);
