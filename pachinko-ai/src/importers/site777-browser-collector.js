@@ -1,100 +1,47 @@
-// SITE777 ARROW 天理店 4円パチ全台 collector V5
-// HallSelectLink.do（ログイン済み）で Console に実行。
-// 設置機種HTMLの listClick() を直接解析し、SITE777自身の HallDedamaLogin.do POST で各機種を取得する。
+// SITE777 collector V5 — 正規に開いた機種ページから台tokenと8日履歴を収集
+// reCAPTCHAは回避しない。SITE777で通常操作して開いたLISTページ上で実行する。
 (async()=>{
  const wait=ms=>new Promise(r=>setTimeout(r,ms));
  const parse=s=>new DOMParser().parseFromString(s,'text/html');
- const norm=s=>(s||'').replace(/\s+/g,' ').trim();
- const models=[],machines=[],history=[];
- const hallHtml=await fetch(location.href,{credentials:'include',cache:'no-store'}).then(r=>r.text());
-
- // listClick(kind, modelCode, edaNo, actionType, uritanka) をHTMLから直接抜く。
- // 4円パチは kindCode=01。機種名/設置台数は同じ<tr>の表示から取得。
- const hd=parse(hallHtml);
- const rows=[...hd.querySelectorAll('tr')];
- for(const tr of rows){
-   const btn=tr.querySelector('input[onclick*="listClick"]');
-   if(!btn)continue;
-   const oc=btn.getAttribute('onclick')||'';
-   const m=oc.match(/listClick\(\s*['"]01['"]\s*,\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]\s*\)/i);
-   if(!m)continue;
-   const text=norm(tr.textContent);
-   const cm=text.match(/(.+?)[（(](\d+)[）)]/);
-   models.push({model:cm?norm(cm[1]):m[1],modelcode:m[1],expectedMachines:cm?+cm[2]:null,edaNo:m[2],actionType:m[3],uritanka:m[4]});
- }
- const uniqModels=[...new Map(models.map(x=>[x.modelcode,x])).values()];
- if(!uniqModels.length)throw new Error('4円パチ機種を取得できませんでした');
- console.log('★★★★★ 4円機種',uniqModels.length,'機種 ★★★★★');
-
- // HTML内の実際のHallDedamaActionFormをテンプレートにする。
- const hallcode=(hallHtml.match(/HallDedamaActionForm\.hallcode\.value\s*=\s*["']([^"']+)/)||[])[1]
-   || hd.querySelector('form[name="HallDedamaActionForm"] [name="hallcode"]')?.value
-   || new URL(location.href).searchParams.get('hallcode') || '';
- const form=hd.querySelector('form[name="HallDedamaActionForm"]');
- if(!form)throw new Error('HallDedamaActionFormが見つかりません');
- const action=new URL(form.getAttribute('action')||'HallDedamaLogin.do',location.href);
-
- for(let i=0;i<uniqModels.length;i++){
-   const x=uniqModels[i];
-   try{
-     const p=new URLSearchParams();
-     for(const e of [...form.elements]){
-       if(!e.name||e.disabled)continue;
-       if((e.type==='checkbox'||e.type==='radio')&&!e.checked)continue;
-       p.append(e.name,e.value||'');
-     }
-     p.set('kindcode','01'); p.set('modelcode',x.modelcode); p.set('edano',x.edaNo);
-     p.set('actiontype',x.actionType); p.set('forward','LIST'); p.set('hallcode',hallcode); p.set('uritanka',x.uritanka);
-     // LISTはreCAPTCHA対象。自動回避はせず、サイト自身が通常submitしている
-     // SEARCH経路を先に使う（selectClick()と同じ正規フロー）。
-     p.set('forward','SEARCH');
-     let r=await fetch(action,{method:'POST',credentials:'include',cache:'no-store',
-       headers:{'Content-Type':'application/x-www-form-urlencoded'},body:p});
-     let html=await r.text(), d=parse(html);
-     const found=[];
-     for(const a of d.querySelectorAll('[onclick*="tableNumClick"]')){
-       const token=(a.getAttribute('onclick')||'').match(/tableNumClick\(['"]([^'"]+)['"]\)/i)?.[1];
-       const no=norm(a.textContent).match(/台番[:：]?\s*(\d+)/)?.[1];
-       if(token&&no)found.push({model:x.model,modelcode:x.modelcode,machineNo:no,tableToken:token,uritanka:x.uritanka});
-     }
-     const u=[...new Map(found.map(y=>[y.machineNo,y])).values()];
-     machines.push(...u);
-     x.machines=u.length;
-     console.log('['+(i+1)+'/'+uniqModels.length+']',x.model,u.length+'/'+(x.expectedMachines??'?')+'台');
-   }catch(e){x.error=String(e);console.warn('機種失敗',x.model,e)}
-   await wait(200);
- }
- const uniqueMachines=[...new Map(machines.map(x=>[x.modelcode+'|'+x.machineNo,x])).values()];
- console.log('★★★★★ 全台token',uniqueMachines.length,'台 ★★★★★');
- if(!uniqueMachines.length){
-   const diag={models:uniqModels,action:action.href,hallcode,note:'機種抽出は成功。機種ページ遷移がSITE777認証フローで止まっています。'};
-   window.SITE777_DIAG=diag;
-   console.error('台token 0。履歴取得を中止。SITE777_DIAG に診断情報を保存しました。');
+ const norm=s=>(s||'').replace(/\\s+/g,' ').trim();
+ const form=document.forms.HallDedamaActionForm;
+ const q=new URL(location.href).searchParams;
+ const hallcode=form?.hallcode?.value||q.get('hallcode')||'';
+ const modelcode=form?.modelcode?.value||q.get('modelcode')||'';
+ const uritanka=form?.uritanka?.value||q.get('uritanka')||'400';
+ const links=[...document.querySelectorAll('a[onclick*="tableNumClick"]')];
+ if(!links.length){
+   console.log('SITE777 V5: このページは台一覧ではありません。通常操作で4円機種を開いてから再実行してください。');
    return;
  }
-
- for(let i=0;i<uniqueMachines.length;i++){
-   const x=uniqueMachines[i];
+ const machines=links.map(a=>{
+   const oc=a.getAttribute('onclick')||'';
+   const tableToken=oc.match(/tableNumClick\\(['"]([^'"]+)['"]\\)/i)?.[1];
+   const machineNo=norm(a.textContent).match(/台番[:：]?\\s*(\\d+)/)?.[1];
+   return tableToken&&machineNo?{modelcode,machineNo,tableToken,uritanka}:null;
+ }).filter(Boolean);
+ const key='SITE777_V5_RESULT';
+ let data; try{data=JSON.parse(localStorage.getItem(key)||'null')}catch{}
+ if(!data)data={source:'site777-browser-v5',hallcode,capturedAt:new Date().toISOString(),machines:[],history:[]};
+ for(const m of machines){
+   if(!data.machines.some(x=>x.modelcode===m.modelcode&&x.machineNo===m.machineNo))data.machines.push(m);
    for(let day=0;day<8;day++){
-     try{
-       const u=new URL('/pc/GraphList.do',location.origin);
-       u.searchParams.set('hallcode',hallcode);u.searchParams.set('tablenum',x.tableToken);
-       u.searchParams.set('tablelistflag','1');u.searchParams.set('day',String(day));
-       u.searchParams.set('currentpageno','1');u.searchParams.set('uritanka',x.uritanka||'400');
-       u.searchParams.set('modelcode',x.modelcode);
-       const r=await fetch(u,{credentials:'include',cache:'no-store'}), html=await r.text();
-       history.push({...x,day,url:r.url,pageText:norm(parse(html).body?.innerText||html)});
-     }catch(e){console.warn('履歴失敗',x.machineNo,day,e)}
+     if(data.history.some(x=>x.modelcode===m.modelcode&&x.machineNo===m.machineNo&&x.day===day))continue;
+     const u=new URL('/pc/GraphList.do',location.origin);
+     u.searchParams.set('hallcode',hallcode);u.searchParams.set('tablenum',m.tableToken);
+     u.searchParams.set('tablelistflag','1');u.searchParams.set('day',String(day));
+     u.searchParams.set('currentpageno','1');u.searchParams.set('uritanka',uritanka);
+     u.searchParams.set('modelcode',modelcode);
+     const r=await fetch(u,{credentials:'include',cache:'no-store'});
+     const html=await r.text();
+     data.history.push({...m,day,url:r.url,pageText:norm(parse(html).body?.innerText||html)});
+     localStorage.setItem(key,JSON.stringify(data));
      await wait(100);
    }
-   console.log('履歴 ['+(i+1)+'/'+uniqueMachines.length+'] 台番',x.machineNo);
+   console.log('台番',m.machineNo,'8日完了');
  }
- const missing=uniqModels.filter(x=>x.expectedMachines!=null&&x.machines!==x.expectedMachines);
- const data={source:'site777-browser-v5',hallcode,capturedAt:new Date().toISOString(),models:uniqModels,machines:uniqueMachines,history};
+ data.capturedAt=new Date().toISOString();localStorage.setItem(key,JSON.stringify(data));
  window.SITE777_RESULT=data;
- console.log('★★★★ 全取得完了 ★★★★','機種',uniqModels.length,'台数',uniqueMachines.length,'履歴',history.length,'不足機種',missing.length);
- if(missing.length)console.table(missing);
- const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
- const a=document.createElement('a');a.href=URL.createObjectURL(blob);
- a.download='site777-4yen-all-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';a.click();
+ console.log('★★★★★ V5取得完了 ★★★★★','今回',machines.length+'台','累計',data.machines.length+'台','履歴',data.history.length+'件');
+ window.SITE777_EXPORT=()=>{const b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='site777-v5-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';a.click()};
 })();
