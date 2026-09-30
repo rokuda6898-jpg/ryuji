@@ -31,7 +31,7 @@
     const action=new URL(form.action||'/pc/TableSelect.do',location.href);
     const r=await fetch(action,{method:'POST',credentials:'include',cache:'no-store',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:p});
     const html=await r.text(),d=new DOMParser().parseFromString(html,'text/html');
-    const rows=[...d.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('th,td')].map(td=>td.innerText.replace(/\\s+/g,' ').trim())).filter(a=>/^(当日|前日|[2-7]前)$/.test(a[0]||''));
+    const rows=[...d.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('th,td')].map(td=>td.innerText.replace(/\s+/g,' ').trim())).filter(a=>/^(当日|前日|[2-7]前)$/.test(a[0]||''));
     for(const a of rows)history.push({model:x.model,mdc:x.mdc,machineNo:x.machineNo,day:a[0],totalStart:a[1]||'',bigHits:a[2]||'',firstHits:a[3]||'',bigHitRate:a[4]||'',firstHitRate:a[5]||'',kakuhenBigHitRate:a[6]||'',currentStart:a[7]||''});
     console.log('8日履歴',x.machineNo,rows.length+'件');
    }catch(e){console.warn('履歴失敗',x.machineNo,e)}
