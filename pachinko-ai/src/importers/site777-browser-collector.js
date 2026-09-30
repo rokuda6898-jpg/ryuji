@@ -10,11 +10,17 @@
  const modelcode=form?.modelcode?.value||q.get('modelcode')||'';
  const uritanka=form?.uritanka?.value||q.get('uritanka')||'400';
  const effectiveModelcode=modelcode||document.querySelector('[name="modelcode"]')?.value||'';
+ const safeSave=(obj)=>{
+   try{localStorage.setItem('SITE777_V5_RESULT',JSON.stringify(obj))}
+   catch(e){console.error('保存容量不足/保存失敗',e);throw e}
+ };
  const fetchText=async(u,tries=3)=>{
    let last;
    for(let n=1;n<=tries;n++){
      try{
-       const r=await fetch(u,{credentials:'include',cache:'no-store'});
+       const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),12000);
+       const r=await fetch(u,{credentials:'include',cache:'no-store',signal:ctl.signal});
+       clearTimeout(timer);
        const html=await r.text();
        if(!r.ok)throw new Error('HTTP '+r.status);
        if(/ログイン|認証|captcha/i.test(norm(parse(html).body?.innerText||'')) && !/グラフ|大当り|台番/.test(norm(parse(html).body?.innerText||'')))
@@ -42,7 +48,7 @@
    if(tableToken&&machineNo)machines.push({modelcode,machineNo,tableToken,uritanka});
  }
  // 同じ台が複数要素に現れても1台に統合。
- const machineMap=new Map(machines.map(x=>[x.machineNo,x]));
+ const machineMap=new Map(machines.map(x=>[(x.modelcode||effectiveModelcode)+'|'+x.machineNo,x]));
  machines.length=0; machines.push(...machineMap.values());
  if(!machines.length){
    const onclicks=[...document.querySelectorAll('[onclick]')].map(x=>x.getAttribute('onclick')).filter(Boolean);
@@ -66,31 +72,38 @@
      const pageText=norm(parse(html).body?.innerText||html);
      if(!pageText)throw new Error('GraphList本文が空です');
      data.history.push({...m,day,url:r.url,pageText});
-     localStorage.setItem(key,JSON.stringify(data));
+     safeSave(data);
      await wait(250);
    }
    console.log('台番',m.machineNo,'8日完了');
  }
- data.capturedAt=new Date().toISOString();localStorage.setItem(key,JSON.stringify(data));
+ data.capturedAt=new Date().toISOString();safeSave(data);
  window.SITE777_RESULT=data;
  console.log('★★★★★ V5取得完了 ★★★★★','今回',machines.length+'台','累計',data.machines.length+'台','履歴',data.history.length+'件');
  // 次に処理する4円機種を記録。認証が必要なページ遷移自体は自動化しない。
  try{
    const hall=(await fetchText('/pc/HallSelectLink.do?hallcode=27090002',3)).html;
    const d=parse(hall), todo=[];
+   const expectedByModel=new Map();
    for(const el of d.querySelectorAll('[onclick*="listClick"]')){
      const oc=el.getAttribute('onclick')||'';
      const mm=oc.match(/listClick\\(\\s*['"]01['"]\\s*,\\s*['"]([^'"]+)['"]\\s*,\\s*['"]([^'"]+)['"]\\s*,\\s*['"]([^'"]+)['"]\\s*,\\s*['"]([^'"]+)['"]\\s*\\)/i);
-     if(mm)todo.push({modelcode:mm[1],edaNo:mm[2],actionType:mm[3],uritanka:mm[4]});
+     if(mm){
+       const row=el.closest('tr')||el.parentElement;
+       const cnt=norm(row?.textContent||'').match(/[（(](\d+)[）)]/)?.[1];
+       const item={modelcode:mm[1],edaNo:mm[2],actionType:mm[3],uritanka:mm[4],expectedMachines:cnt?+cnt:null};
+       todo.push(item); expectedByModel.set(mm[1],item.expectedMachines);
+     }
    }
    const completeModels=new Set();
    for(const mc of new Set(data.machines.map(x=>x.modelcode))){
      const ms=data.machines.filter(x=>x.modelcode===mc);
-     if(ms.length && ms.every(m=>[0,1,2,3,4,5,6,7].every(day=>data.history.some(h=>h.modelcode===mc&&h.machineNo===m.machineNo&&h.day===day))))
+     const expected=expectedByModel.get(mc);
+     if(ms.length && (expected==null||ms.length===expected) && ms.every(m=>[0,1,2,3,4,5,6,7].every(day=>data.history.some(h=>h.modelcode===mc&&h.machineNo===m.machineNo&&h.day===day))))
        completeModels.add(mc);
    }
    data.todo=[...new Map(todo.map(x=>[x.modelcode,x])).values()].filter(x=>!completeModels.has(x.modelcode));
-   localStorage.setItem(key,JSON.stringify(data));
+   safeSave(data);
    console.log('未取得機種',data.todo.length,'/','全4円機種',new Set(todo.map(x=>x.modelcode)).size);
  }catch(e){console.warn('未取得機種一覧の更新失敗',e)}
  // 通常のSITE777操作で次の未取得4円機種を開くヘルパー。
@@ -144,7 +157,7 @@
      if(!(latest.history||[]).some(h=>h.modelcode===m.modelcode&&h.machineNo===m.machineNo&&h.day===day))
        missing.push({modelcode:m.modelcode,machineNo:m.machineNo,day});
    latest.validation={expectedHistory:expected,actualHistory:actual,missingHistory:missing.length,remainingModels:latest.todo?.length??null,ok:missing.length===0&&(latest.todo?.length??1)===0};
-   localStorage.setItem(key,JSON.stringify(latest));
+   safeSave(latest);
    console.log('★★★★★ 最終検証 ★★★★★',latest.validation);
    if(missing.length)console.table(missing);
    const b=new Blob([JSON.stringify(latest,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='site777-v5-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';a.click()
