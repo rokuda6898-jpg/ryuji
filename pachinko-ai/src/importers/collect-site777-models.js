@@ -3,7 +3,7 @@ import path from 'node:path';
 import { discoverFourYenModels } from './site777-discovery.js';
 import { parseSite777GraphList } from './site777-html.js';
 const ROOT=process.env.SITE777_ROOT_URL||'https://m.site777.jp';
-const DEFAULT_URL='https://m.site777.jp/do/D4300.do?pmc=27090002&mdc=026297&bn=1&urt=400&dsgk=0&dtdd=0&pan=1';
+const DEFAULT_URL='https://m.site777.jp/do/D4300.do?pmc=27090002&mdc=026135&bn=1&pan=1&urt=400&dsgk=0&dtdd=0&bmdn=0&bmmdc=025867&bmbn=1&bmurt=400&bmurtHji=400&bmgk=7&bmclc=01&bmsk=0';
 const INDEX=process.env.SITE777_INDEX_URL||process.env.SITE777_URL||DEFAULT_URL;
 const SEA=[/海物語/i,/大海/i,/スーパー海/i,/新海/i,/沖海/i,/地中海/i,/わんわんパラダイス/i];
 const isSea=s=>SEA.some(re=>re.test(s||''));
