@@ -94,7 +94,25 @@
    console.log('累計台数',x.machines?.length||0,'履歴',x.history?.length||0,'未取得機種',x.todo?.length??'?');
    return x;
  };
- window.SITE777_EXPORT=()=>{const b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='site777-v5-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';a.click()};
+ window.SITE777_RESET=()=>{
+   localStorage.removeItem(key);
+   sessionStorage.removeItem('SITE777_V5_AUTORUN');
+   console.log('SITE777 V5 保存データをリセットしました');
+ };
+ window.SITE777_EXPORT=()=>{
+   const latest=JSON.parse(localStorage.getItem(key)||JSON.stringify(data));
+   const expected=(latest.machines?.length||0)*8;
+   const actual=latest.history?.length||0;
+   const missing=[];
+   for(const m of latest.machines||[])for(let day=0;day<8;day++)
+     if(!(latest.history||[]).some(h=>h.modelcode===m.modelcode&&h.machineNo===m.machineNo&&h.day===day))
+       missing.push({modelcode:m.modelcode,machineNo:m.machineNo,day});
+   latest.validation={expectedHistory:expected,actualHistory:actual,missingHistory:missing.length,remainingModels:latest.todo?.length??null,ok:missing.length===0&&(latest.todo?.length??1)===0};
+   localStorage.setItem(key,JSON.stringify(latest));
+   console.log('★★★★★ 最終検証 ★★★★★',latest.validation);
+   if(missing.length)console.table(missing);
+   const b=new Blob([JSON.stringify(latest,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='site777-v5-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';a.click()
+ };
  if(sessionStorage.getItem('SITE777_V5_AUTORUN')==='1'){
    console.log('SITE777 V5 AUTORUN 有効');
    // 現在ページの収集は上で完了済み。次の操作を1関数に統一。
