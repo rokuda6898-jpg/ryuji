@@ -57,5 +57,23 @@
    localStorage.setItem(key,JSON.stringify(data));
    console.log('未取得機種',data.todo.length,'/','全4円機種',new Set(todo.map(x=>x.modelcode)).size);
  }catch(e){console.warn('未取得機種一覧の更新失敗',e)}
+ // 通常のSITE777操作で次の未取得4円機種を開くヘルパー。
+ // listClick()をそのまま呼ぶため、SITE777自身のreCAPTCHA/通常遷移を維持する。
+ window.SITE777_NEXT=()=>{
+   const latest=JSON.parse(localStorage.getItem(key)||'{}');
+   const next=latest.todo?.[0];
+   if(!next){console.log('★★★★★ 未取得機種なし ★★★★★');return}
+   if(typeof window.listClick!=='function'){
+     console.log('ホール機種一覧ページへ戻って SITE777_NEXT() を実行してください');
+     return;
+   }
+   console.log('次の未取得機種を通常遷移で開きます:',next.modelcode);
+   window.listClick('01',next.modelcode,next.edaNo,next.actionType,next.uritanka);
+ };
+ window.SITE777_STATUS=()=>{
+   const x=JSON.parse(localStorage.getItem(key)||'{}');
+   console.log('累計台数',x.machines?.length||0,'履歴',x.history?.length||0,'未取得機種',x.todo?.length??'?');
+   return x;
+ };
  window.SITE777_EXPORT=()=>{const b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='site777-v5-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';a.click()};
 })();
