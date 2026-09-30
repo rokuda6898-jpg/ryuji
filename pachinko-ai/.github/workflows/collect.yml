@@ -2,7 +2,14 @@ name: collect-4yen
 on:
   workflow_dispatch:
   schedule:
-    - cron: '30 21 * * *'
+    # JST 10:30 / 12:31 / 14:32 / 16:33 / 18:34 / 20:35 / 22:36
+    - cron: '30 1 * * *'
+    - cron: '31 3 * * *'
+    - cron: '32 5 * * *'
+    - cron: '33 7 * * *'
+    - cron: '34 9 * * *'
+    - cron: '35 11 * * *'
+    - cron: '36 13 * * *'
 jobs:
   collect:
     runs-on: ubuntu-latest
@@ -14,9 +21,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: node src/importers/site777.js
+      - name: Fetch Site777 source
+        run: node src/importers/site777.js
+      - name: Validate fetched page
+        run: node src/importers/validate-latest.js
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: site777-raw
+          name: site777-raw-${{ github.run_id }}
           path: pachinko-ai/data/raw/
