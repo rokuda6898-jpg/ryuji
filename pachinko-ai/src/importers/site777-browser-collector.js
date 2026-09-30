@@ -14,7 +14,7 @@
   while((m=re.exec(html))){machines.push({model,mdc,machineNo:m[2],tableToken:m[1],chartUrl:new URL(m[3].replace(/&amp;/g,'&'),url).href});n++}
   models.push({model,mdc,url,machines:n});console.log('4円取得',models.length,model,n+'台');
  };
- const first=await fetch(location.href,{credentials:'include',cache:'no-store'}).then(r=>r.text());discover(first);addModel(seed.searchParams.get('mdc'));console.log('機種候補',q.length);
+ const first=await fetch(location.href,{credentials:'include',cache:'no-store'}).then(r=>r.text());discover(first);addModel(seed.searchParams.get('mdc')); if(!q.length){for(const a of document.querySelectorAll('a[href]')){try{const u=new URL(a.href,location.href),code=u.searchParams.get('mdc')||u.searchParams.get('modelcode');if(code)addModel(code,a.textContent.trim())}catch{}}} if(!q.length){const codes=[...document.documentElement.innerHTML.matchAll(/(?:modelClick\([^,]+,\s*['\"]|(?:mdc|modelcode)=)([0-9A-Za-z_-]+)/gi)].map(m=>m[1]);for(const code of codes)addModel(code)} console.log('機種候補',q.length);
  while(q.length&&seen.size<500){const url=q.shift();if(seen.has(url))continue;seen.add(url);try{const html=await fetch(url,{credentials:'include',cache:'no-store'}).then(r=>r.text());discover(html);extract(html,url)}catch(e){console.warn('失敗',url,e)}await wait(400)}
  const unique=[...new Map(machines.map(x=>[(x.mdc||x.model)+'|'+x.machineNo,x])).values()];
  // Logged-in d-deltanet detail pages: collect current day through 7 days ago.
