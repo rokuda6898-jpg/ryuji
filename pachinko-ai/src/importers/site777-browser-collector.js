@@ -10,8 +10,8 @@
   const d=new DOMParser().parseFromString(html,'text/html'),head=d.querySelector('#machine_name')?.textContent||'',is4=/【\s*4\s*】パチ/.test(head)||/【\s*4\s*】パチ/.test(d.body?.innerText||'');
   if(!is4)return;
   const model=head.replace(/【\s*4\s*】パチ/g,'').trim()||d.title,mdc=new URL(url).searchParams.get('modelcode');let m,n=0;
-  const re=/tableNumClick\('([^']+)'\)[\s\S]*?台番:([0-9]+)[\s\S]*?<img\s+src="([^"]*RequestPcDedamaTransitionKahenRangeChart\.do\?param=[^"]+)"/gi;
-  while((m=re.exec(html))){machines.push({model,mdc,machineNo:m[2],tableToken:m[1],chartUrl:new URL(m[3].replace(/&amp;/g,'&'),url).href});n++}
+  const links=[...d.querySelectorAll('a[onclick*="tableNumClick"]')];
+  for(const a of links){const oc=a.getAttribute('onclick')||'',tm=oc.match(/tableNumClick\(['\"]([^'\"]+)['\"]\)/i),nm=(a.textContent||'').match(/台番[:：]?\s*([0-9]+)/);if(!tm||!nm)continue;const box=a.closest('dd,li,td,div')||a.parentElement,im=box?.querySelector('img[src*="RequestPcDedamaTransitionKahenRangeChart"]');machines.push({model,mdc,machineNo:nm[1],tableToken:tm[1],chartUrl:im?new URL(im.getAttribute('src'),url).href:''});n++}
   models.push({model,mdc,url,machines:n});console.log('4円取得',models.length,model,n+'台');
  };
  const first=await fetch(location.href,{credentials:'include',cache:'no-store'}).then(r=>r.text());discover(first);addModel(seed.searchParams.get('mdc')); if(!q.length){for(const a of document.querySelectorAll('a[href]')){try{const u=new URL(a.href,location.href),code=u.searchParams.get('mdc')||u.searchParams.get('modelcode');if(code)addModel(code,a.textContent.trim())}catch{}}} if(!q.length){const codes=[...document.documentElement.innerHTML.matchAll(/(?:modelClick\([^,]+,\s*['\"]|(?:mdc|modelcode)=)([0-9A-Za-z_-]+)/gi)].map(m=>m[1]);for(const code of codes)addModel(code)} console.log('機種候補',q.length);
