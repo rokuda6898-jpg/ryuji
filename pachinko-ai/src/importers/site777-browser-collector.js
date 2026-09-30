@@ -1,7 +1,7 @@
 // SITE777 browser-session collector: discovers models from modelClick/modelcode and machines from tableNumClick.
 (async()=>{
  const wait=ms=>new Promise(r=>setTimeout(r,ms)),seed=new URL(location.href),seen=new Set(),q=[],models=[],machines=[],history=[];
- const addModel=(code,name='')=>{if(!code)return;const u=new URL('/pc/D4300.do',location.origin);for(const k of ['pmc','bn','pan','urt','dsgk','dtdd','bmdn','bmmdc','bmbn','bmurt','bmurtHji','bmgk','bmclc','bmsk'])if(seed.searchParams.has(k))u.searchParams.set(k,seed.searchParams.get(k));u.searchParams.set('mdc',code);const s=u.href;if(!seen.has(s)&&!q.includes(s))q.push(s)};
+ const addModel=(code,name='')=>{if(!code)return;const u=new URL('ModelTop.do',location.href);for(const k of ['pmc','bn','pan','urt','dsgk','dtdd','bmdn','bmmdc','bmbn','bmurt','bmurtHji','bmgk','bmclc','bmsk'])if(seed.searchParams.has(k))u.searchParams.set(k,seed.searchParams.get(k));u.searchParams.set('modelcode',code);const s=u.href;if(!seen.has(s)&&!q.includes(s))q.push(s)};
  const discover=html=>{
   let m;
   for(const re of [/modelClick\(['"]01['"]\s*,\s*['"]([^'"]+)['"]\)[\s\S]{0,300}?>([^<]+)<\/a>/gi,/(?:modelcode|mdc)=([0-9A-Za-z_-]+)[^"'<>]*[\s\S]{0,250}?>([^<]+)<\/a>/gi])while((m=re.exec(html)))addModel(m[1],m[2]);
@@ -9,7 +9,7 @@
  const extract=(html,url)=>{
   const d=new DOMParser().parseFromString(html,'text/html'),head=d.querySelector('#machine_name')?.textContent||'',is4=/【\s*4\s*】パチ/.test(head)||/【\s*4\s*】パチ/.test(d.body?.innerText||'');
   if(!is4)return;
-  const model=head.replace(/【\s*4\s*】パチ/g,'').trim()||d.title,mdc=new URL(url).searchParams.get('mdc');let m,n=0;
+  const model=head.replace(/【\s*4\s*】パチ/g,'').trim()||d.title,mdc=new URL(url).searchParams.get('modelcode');let m,n=0;
   const re=/tableNumClick\('([^']+)'\)[\s\S]*?台番:([0-9]+)[\s\S]*?<img\s+src="([^"]*RequestPcDedamaTransitionKahenRangeChart\.do\?param=[^"]+)"/gi;
   while((m=re.exec(html))){machines.push({model,mdc,machineNo:m[2],tableToken:m[1],chartUrl:new URL(m[3].replace(/&amp;/g,'&'),url).href});n++}
   models.push({model,mdc,url,machines:n});console.log('4円取得',models.length,model,n+'台');
