@@ -9,7 +9,9 @@
     "import:site777": "node src/importers/import-saved-pages.js data/inbox",
     "import:mobile": "node src/importers/import-mobile-html.js",
     "collect:site777": "node src/importers/collect-site777-models.js",
-    "collect:4yen": "node src/importers/collect-site777-models.js"
+    "collect:4yen": "node src/importers/collect-site777-models.js",
+    "import:browser": "node src/importers/import-browser-bulk.js",
+    "analyze:browser": "node src/index.js data/browser-history.json data/ranking.json"
   },
   "engines": {
     "node": ">=20"
