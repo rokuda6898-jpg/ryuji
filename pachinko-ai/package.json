@@ -1,1 +1,1 @@
-{"name":"pachinko-ai","version":"0.1.0","private":true,"type":"module","scripts":{"start":"node src/index.js","analyze":"node src/index.js","import:site777":"node src/importers/import-saved-pages.js data/inbox"},"engines":{"node":">=20"}}
+{"name":"pachinko-ai","version":"0.1.0","private":true,"type":"module","scripts":{"start":"node src/index.js","analyze":"node src/index.js","import:site777":"node src/importers/import-saved-pages.js data/inbox","import:mobile":"node src/importers/import-mobile-html.js"},"engines":{"node":">=20"}}
