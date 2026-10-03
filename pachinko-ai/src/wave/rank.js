@@ -1,4 +1,5 @@
 import {waveFeatures,cosineSimilarity} from './features.js';
+import {reactionZoneAnalysis} from './support-zones.js';
 
 const clamp=(v,min=0,max=100)=>Math.max(min,Math.min(max,Number.isFinite(v)?v:min));
 const values=p=>(p||[]).map(x=>Number(x?.value??x?.diffBalls??x)).filter(Number.isFinite);
@@ -64,7 +65,7 @@ function percentileScore(value,group=[]){
 /**
  * Chart-first ranking.
  * Weighting:
- * - long-term shape 40% = 7-day shape 15 + recent 3-day shape 15 + similar charts 10
+ * - long-term shape 40% = repeated rebound zones 20 + 7-day shape 5 + recent 3-day shape 5 + similar charts 10
  * - today's chart shape 20
  * - recent momentum / acceleration 15
  * - first-hit / RUSH behavior 10
@@ -75,6 +76,7 @@ export function rankWaves(machines=[]){
  const base=machines.map(m=>{
   const history=(Array.isArray(m.history)?m.history:[]).filter(Boolean).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
   const current=m.points||m.current?.points||[];
+  const reaction=reactionZoneAnalysis(current);
   const long7=historyScore(history,7);
   const long3=historyScore(history,3);
   const similar=similarityScore(current,history.slice(-7));
@@ -82,8 +84,8 @@ export function rankWaves(machines=[]){
   const momentum=clamp(trendScore(current,.25)*.6+accelerationScore(current)*.4);
   const hitRush=hitRushScore(m);
   const hallMachine=hallMachineScore(m,history);
-  const preRelative=long7*.15+long3*.15+similar*.10+today*.20+momentum*.15+hitRush*.10+hallMachine*.05;
-  return {m,history,current,long7,long3,similar,today,momentum,hitRush,hallMachine,preRelative};
+  const preRelative=reaction.score*.20+long7*.05+long3*.05+similar*.10+today*.20+momentum*.15+hitRush*.10+hallMachine*.05;
+  return {m,history,current,reaction,long7,long3,similar,today,momentum,hitRush,hallMachine,preRelative};
  });
 
  const groups=new Map();
@@ -92,7 +94,7 @@ export function rankWaves(machines=[]){
  return base.map(x=>{
   const modelRelative=percentileScore(x.preRelative,groups.get(String(x.m.model||''))||[]);
   const score=clamp(
-   x.long7*.15+x.long3*.15+x.similar*.10+
+   x.reaction.score*.20+x.long7*.05+x.long3*.05+x.similar*.10+
    x.today*.20+x.momentum*.15+x.hitRush*.10+
    modelRelative*.10+x.hallMachine*.05
   );
@@ -100,7 +102,7 @@ export function rankWaves(machines=[]){
    machineNo:x.m.machineNo,model:x.m.model,score:Math.round(score*100)/100,
    weights:{longTerm:40,todayShape:20,momentum:15,hitRush:10,modelRelative:10,hallMachine:5},
    breakdown:{
-    longTerm:{score:Math.round((x.long7*.375+x.long3*.375+x.similar*.25)*100)/100,sevenDay:x.long7,threeDay:x.long3,similarCharts:x.similar,contribution:Math.round((x.long7*.15+x.long3*.15+x.similar*.10)*100)/100},
+    longTerm:{score:Math.round((x.reaction.score*.50+x.long7*.125+x.long3*.125+x.similar*.25)*100)/100,reactionZone:x.reaction,sevenDay:x.long7,threeDay:x.long3,similarCharts:x.similar,contribution:Math.round((x.reaction.score*.20+x.long7*.05+x.long3*.05+x.similar*.10)*100)/100},
     todayShape:{score:x.today,contribution:Math.round(x.today*.20*100)/100},
     momentum:{score:x.momentum,contribution:Math.round(x.momentum*.15*100)/100},
     hitRush:{score:x.hitRush,contribution:Math.round(x.hitRush*.10*100)/100},
@@ -109,7 +111,7 @@ export function rankWaves(machines=[]){
    },
    features:waveFeatures(x.current),
    reasons:[
-    '長期形状40%（7日15%＋3日15%＋類似チャート10%）',
+    `長期形状40%（反発帯20%＋7日5%＋3日5%＋類似10%）：${x.reaction.state}・過去接触${x.reaction.touches}回/反発${x.reaction.reactions}回`,
     '当日グラフ20% / 直近勢い15%',
     '初当り・RUSH10% / 同一機種比較10% / 店・台癖5%'
    ],
