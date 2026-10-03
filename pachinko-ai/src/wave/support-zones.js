@@ -49,7 +49,7 @@ export function reactionZoneAnalysis(points=[]){
  const end=y.at(-1),nearest=[...zones].sort((a,b)=>Math.abs(end-a.center)-Math.abs(end-b.center))[0];
  const dist=Math.abs(end-nearest.center),proximity=clamp(100*(1-dist/(tol*2.5)));
  const recent=y.slice(-Math.max(5,Math.floor(y.length*.05))),slope=recent.at(-1)-recent[0];
- const motion=slope<0?1:slope<tol?.8:.65;
+ const motion=slope<0?1:slope<tol?0.8:0.65;
  const score=clamp(nearest.strength*.7+proximity*.3+(proximity>65?motion*8:0));
  const state=dist<=tol?'反発帯の中':dist<=tol*2?'反発帯接近':(slope>0&&end>nearest.center?'反発帯から上昇':'反発帯から離れ');
  return{score:Math.round(score),usable:true,state,touches:nearest.touches,reactions:nearest.reactions,rate:Math.round(nearest.rate*100),band:[nearest.center-tol,nearest.center+tol],proximity:Math.round(proximity)};
